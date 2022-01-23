@@ -1,2 +1,0 @@
-- [ ] create one organization per class
-- [ ] add created users to the correct organization

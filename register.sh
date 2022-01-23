@@ -6,7 +6,7 @@ while read line
 do
     name="$(echo $line | cut -d ',' -f 1)"
     email="$(echo $line | cut -d ',' -f 2)"
-    username="$(echo $name | tr -cd '[:alpha:]' | tr '[:upper:]' '[:lower:]')"
+    username="$(echo $name | tr -d '[:space:]' | tr -d '[:punct:]' | tr '[:upper:]' '[:lower:]')"
     password="$(pwgen -n 24 1)"
 
     echo "create account for ${name} ${email} ${username}"

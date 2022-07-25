@@ -33,7 +33,7 @@ teams:
   - teamname: alligators
     description: Team Alligators
     users:
-      - username: rudi_loehnlein
+      - username: rudi_loehlein
         fullname: Rudi Löhlein
         email: patrick.bucher87+rudi_loehlein@gmail.com
       - username: mai_ling
@@ -45,7 +45,7 @@ teams:
       - username: john_doe
         fullname: John Doe
         email: patrick.bucher87+john_doe@gmail.com
-      - username: Jane Done
+      - username: jane_done
         fullname: Jane Done
         email: patrick.bucher87+jane_done@gmail.com
 ```

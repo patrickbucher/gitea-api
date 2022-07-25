@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import secrets
+import string
+
 import click
 import requests
 import yaml
@@ -115,17 +118,17 @@ def delete_org(ctx, org):
 @cli.command(help='Registers all the teams with users to a given organization')
 @click.option('--org')
 @click.option('--bulkfile', type=click.File('r'))
+@click.option('--no-notify', is_flag=True, help='Do not send notification email')
 @click.pass_context
-def bulk_register(ctx, org, bulkfile):
+def bulk_register(ctx, org, bulkfile, no_notify):
     data = yaml.load(bulkfile.read(), Loader=yaml.SafeLoader)
 
-    # TODO: needed later?
     assert http_get(ctx, f'orgs/{org}').status_code == 200
-    organization = http_get(ctx, f'orgs/{org}').json()
 
     for team_entry in data.get('teams', {}):
+        teamname = team_entry['teamname']
         new_team = {
-            'name': team_entry['teamname'],
+            'name': teamname,
             'description': team_entry['description'], 
             'units': [
                 'repo.code',
@@ -135,8 +138,59 @@ def bulk_register(ctx, org, bulkfile):
             ],
         }
         res = http_post(ctx, f'orgs/{org}/teams', new_team)
-        print(res)
-        print(res.json())
+        if res.status_code != 201:
+            print(f'create team "{teamname}" failed: {res.status_code}')
+            continue
+        else:
+            print(f'created team "{teamname}"')
+        team_id = res.json().get('id', 0)
+
+        for user_entry in team_entry.get('users', []):
+            username = user_entry['username']
+            fullname = user_entry['fullname']
+            email = user_entry['email']
+            register_user(ctx, username, fullname, email, not no_notify)
+            add_user_to_team(ctx, username, team_id)
+
+
+def add_user_to_team(ctx, username, team_id):
+    res = http_put(ctx, f'teams/{team_id}/members/{username}')
+    if res.status_code != 204:
+        print(f'add user "{username}" to team "{team_id}" failed: {res.status_code}')
+    else:
+        print(f'added user "{username}" to team "{team_id}"')
+
+
+def register_user(ctx, username, fullname, email, notify):
+    new_user = {
+        'username': username,
+        'email': email,
+        'full_name': fullname,
+        'must_change_password': True,
+        'restricted': True,
+        'send_notify': notify,
+        'visibility': 'limited',
+        'password': generate_password(),
+    }
+    res = http_post(ctx, 'admin/users', new_user)
+    if res.status_code != 201:
+        print(f'register user "{username}" failed: {res.status_code}')
+    else:
+        print(f'registered user "{username}"', res.json())
+
+
+@cli.command(help='Generate a random password of given length')
+@click.option('--length', default=24)
+def genpw(length):
+    print(generate_password(length))
+
+
+def generate_password(length=24):
+    alphabet = list(string.ascii_letters) + list(string.digits)
+    password = ''
+    for i in range(length):
+        password += secrets.choice(alphabet)
+    return password
 
 
 def http_get(ctx, endpoint, accept='application/json'):
@@ -155,6 +209,14 @@ def http_post(ctx, endpoint, payload, content_type='application/json',
     headers['Content-Type'] = content_type
     headers['Accept'] = accept
     return requests.post(url, json=payload, headers=headers)
+
+
+def http_put(ctx, endpoint, accept='application/json'):
+    base_url = ctx.obj['BASE_URL']
+    url = f'{base_url}/{endpoint}'
+    headers = get_auth_header(ctx)
+    headers['Accept'] = accept
+    return requests.put(url, headers=headers)
 
 
 def http_delete(ctx, endpoint, accept='application/json'):

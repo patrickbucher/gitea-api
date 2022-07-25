@@ -52,7 +52,7 @@ teams:
 
 Using the `bulk-register` command, and a given organization name (`--org`):
 
-    $ ./gitea.py bulk-register --bulkfile bulk-registrations.yaml
+    $ ./gitea.py bulk-register --org demo --bulkfile bulk-registrations.yaml
 
 The following steps are performed:
 

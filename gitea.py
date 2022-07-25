@@ -82,6 +82,20 @@ def delete_users(ctx):
         ctx.invoke(delete_user, name=user['login'])
 
 
+@cli.command(help='Delete the given organization with all repos')
+@click.option('--org')
+@click.pass_context
+def delete_org(ctx, org):
+    to_delete = http_get(ctx, f'orgs/{org}').json()
+    repos = http_get(ctx, f'orgs/{org}/repos').json()
+    owned = filter(lambda r: r.get('owner', {}).get('login', '') == org, repos)
+    names = map(lambda r: r.get('name', ''), owned)
+    for repo in names:
+        print(f'delete {repo} of {org}')
+        print(http_delete(ctx, f'repos/{org}/{repo}'))
+    print(http_delete(ctx, f'orgs/{org}'))
+
+
 def http_get(ctx, endpoint, accept='application/json'):
     base_url = ctx.obj['BASE_URL']
     url = f'{base_url}/{endpoint}'

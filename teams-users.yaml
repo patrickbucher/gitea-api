@@ -12,6 +12,7 @@ teams:
   - teamname: badgers
     fullname: Badgers
     description: Team Badgers
+    users:
       - username: john_doe
         fullname: John Doe
         email: patrick.bucher87+john_doe@gmail.com

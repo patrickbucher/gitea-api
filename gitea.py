@@ -47,17 +47,52 @@ def list_teams(ctx, org):
     print(http_get(ctx, f'orgs/{org}/teams').json())
 
 
+@cli.command(help='List all repos of a user')
+@click.option('--username')
+@click.pass_context
+def list_repos(ctx, username):
+    print(http_get(ctx, f'users/{username}/repos').json())
+
+
+@cli.command(help='Delete a user by its username with all owned repos')
+@click.option('--name')
+@click.pass_context
+def delete_user(ctx, name):
+    repos = http_get(ctx, f'users/{name}/repos').json()
+    owned = filter(lambda r: r.get('owner', {}).get('login', '') == name, repos)
+    names = map(lambda r: r.get('name', ''), owned)
+    for repo in names:
+        print(f'delete {repo} of {name}')
+        print(http_delete(ctx, f'repos/{name}/{repo}'))
+    orgs = http_get(ctx, f'users/{name}/orgs').json()
+    org_names = map(lambda o: o.get('username', ''), orgs)
+    for org_name in org_names:
+        print(f'remove {name} from {org_name}')
+        print(http_delete(ctx, f'orgs/{org_name}/members/{name}'))
+    print(http_delete(ctx, f'admin/users/{name}'))
+
+
 def http_get(ctx, endpoint, accept='application/json'):
     base_url = ctx.obj['BASE_URL']
-    token_file = ctx.obj['TOKEN_FILE']
     url = f'{base_url}/{endpoint}'
+    headers = get_auth_header(ctx)
+    headers['Accept'] = accept
+    return requests.get(url, headers=headers)
+
+
+def http_delete(ctx, endpoint, accept='application/json'):
+    base_url = ctx.obj['BASE_URL']
+    url = f'{base_url}/{endpoint}'
+    headers = get_auth_header(ctx)
+    headers['Accept'] = accept
+    return requests.delete(url, headers=headers)
+
+
+def get_auth_header(ctx):
+    token_file = ctx.obj['TOKEN_FILE']
     with open(token_file, 'r') as f:
         token = f.read().strip()
-    headers = {
-        'Accept': accept,
-        'Authorization': f'token {token}',
-    }
-    return requests.get(url, headers=headers)
+        return {'Authorization': f'token {token}'}
 
 
 if __name__ == '__main__':

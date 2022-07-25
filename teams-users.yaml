@@ -1,0 +1,20 @@
+teams:
+  - teamname: alligators
+    fullname: Alligators
+    description: Team Alligators
+    users:
+      - username: rudi_loehnlein
+        fullname: Rudi Löhlein
+        email: patrick.bucher87+rudi_loehlein@gmail.com
+      - username: mai_ling
+        fullname: Mai Ling
+        email: patrick.bucher87+mai_ling@gmail.com
+  - teamname: badgers
+    fullname: Badgers
+    description: Team Badgers
+      - username: john_doe
+        fullname: John Doe
+        email: patrick.bucher87+john_doe@gmail.com
+      - username: Jane Done
+        fullname: Jane Done
+        email: patrick.bucher87+jane_done@gmail.com

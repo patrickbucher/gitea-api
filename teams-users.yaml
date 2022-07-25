@@ -1,6 +1,5 @@
 teams:
   - teamname: alligators
-    fullname: Alligators
     description: Team Alligators
     users:
       - username: rudi_loehnlein
@@ -10,7 +9,6 @@ teams:
         fullname: Mai Ling
         email: patrick.bucher87+mai_ling@gmail.com
   - teamname: badgers
-    fullname: Badgers
     description: Team Badgers
     users:
       - username: john_doe

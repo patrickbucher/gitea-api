@@ -72,6 +72,18 @@ def delete_user(ctx, name):
     print(http_delete(ctx, f'admin/users/{name}'))
 
 
+@cli.command(help='Delete all users except the one authenticated')
+@click.pass_context
+def delete_users(ctx):
+    keep = http_get(ctx, 'user').json()
+    users = http_get(ctx, 'admin/users').json()
+    def same_user(a, b):
+        return a['id'] == b['id'] and a['login'] == b['login']
+    to_delete = filter(lambda u: not same_user(u, keep), users)
+    for user in to_delete:
+        ctx.invoke(delete_user, name=user['login'])
+
+
 def http_get(ctx, endpoint, accept='application/json'):
     base_url = ctx.obj['BASE_URL']
     url = f'{base_url}/{endpoint}'

@@ -130,12 +130,14 @@ def bulk_register(ctx, org, bulkfile, no_notify):
         new_team = {
             'name': teamname,
             'description': team_entry['description'], 
+            'permission': 'read',
             'units': [
                 'repo.code',
                 'repo.issues',
                 'repo.pulls',
                 'repo.releases',
             ],
+            'includes_all_repositories': True,
         }
         res = http_post(ctx, f'orgs/{org}/teams', new_team)
         if res.status_code != 201:
@@ -151,6 +153,27 @@ def bulk_register(ctx, org, bulkfile, no_notify):
             email = user_entry['email']
             register_user(ctx, username, fullname, email, not no_notify)
             add_user_to_team(ctx, username, team_id)
+
+
+@cli.command(help='Sets team reading permission for code, issues, pull-requests and releases')
+@click.option('--org')
+@click.pass_context
+def set_team_read_rights(ctx, org):
+    teams = http_get(ctx, f'orgs/{org}/teams').json()
+    team_ids = [t['id'] for t in teams if t['name'] != 'Owners']
+    units_map = {f'repo.{scope}': 'read'
+                 for scope in ['code', 'issues', 'pulls', 'releases']}
+    payload = {
+        'units_map': units_map,
+        'includes_all_repositories': True,
+        'permission': 'read'
+    }
+    for id in team_ids:
+        res = http_patch(ctx, f'teams/{id}', payload)
+        if res.status_code != 200:
+            print(f'set team {id} read rights failed: {res.status_code}')
+        else:
+            print(f'set team {id} read rights to read')
 
 
 def add_user_to_team(ctx, username, team_id):
@@ -209,6 +232,16 @@ def http_post(ctx, endpoint, payload, content_type='application/json',
     headers['Content-Type'] = content_type
     headers['Accept'] = accept
     return requests.post(url, json=payload, headers=headers)
+
+
+def http_patch(ctx, endpoint, payload, content_type='application/json',
+               accept='application/json'):
+    base_url = ctx.obj['BASE_URL']
+    url = f'{base_url}/{endpoint}'
+    headers = get_auth_header(ctx)
+    headers['Content-Type'] = content_type
+    headers['Accept'] = accept
+    return requests.patch(url, json=payload, headers=headers)
 
 
 def http_put(ctx, endpoint, accept='application/json'):

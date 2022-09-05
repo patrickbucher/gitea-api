@@ -61,7 +61,8 @@ def list_repos(ctx, username):
 @click.pass_context
 def delete_user(ctx, name):
     repos = http_get(ctx, f'users/{name}/repos').json()
-    owned = filter(lambda r: r.get('owner', {}).get('login', '') == name, repos)
+    owned = filter(lambda r: r.get('owner', {}).get('login', '') == name,
+                   repos)
     names = map(lambda r: r.get('name', ''), owned)
     for repo in names:
         print(f'delete {repo} of {name}')
@@ -79,6 +80,7 @@ def delete_user(ctx, name):
 def delete_users(ctx):
     keep = http_get(ctx, 'user').json()
     users = http_get(ctx, 'admin/users').json()
+
     def same_user(a, b):
         return a['id'] == b['id'] and a['login'] == b['login']
     to_delete = filter(lambda u: not same_user(u, keep), users)
@@ -129,7 +131,7 @@ def bulk_register(ctx, org, bulkfile, no_notify):
         teamname = team_entry['teamname']
         new_team = {
             'name': teamname,
-            'description': team_entry['description'], 
+            'description': team_entry['description'],
             'permission': 'read',
             'units': [
                 'repo.code',
@@ -176,12 +178,39 @@ def set_team_read_rights(ctx, org):
             print(f'set team {id} read rights to read')
 
 
-def add_user_to_team(ctx, username, team_id):
-    res = http_put(ctx, f'teams/{team_id}/members/{username}')
+@cli.command(help='Lists the pull requests of a team for a repository')
+@click.option('--owner')
+@click.option('--repo')
+@click.option('--team')
+@click.pass_context
+def list_pull_requests(ctx, owner, repo, team):
+    org_teams = http_get(ctx, f'orgs/{owner}/teams').json()
+    teams = list(filter(lambda t: t.get('name', '') == team, org_teams))
+    if len(teams) != 1:
+        print(f'looked for team {team}, found', len(teams))
+    team_id = teams[0].get('id', 0)
+    team_members = http_get(ctx, f'teams/{team_id}/members').json()
+    team_usernames = [m.get('username', '') for m in team_members]
+    pull_requests = http_get(ctx, f'repos/{owner}/{repo}/pulls').json()
+    user_prs = {p.get('user', {}).get('login', {}): p for p in pull_requests}
+    team_prs = {k: v for k, v in user_prs.items() if k in team_usernames}
+    repo_prs = {k: v for k, v in team_prs.items()
+                if v.get('base', {}).get('repo', {}).get('name', '') == repo}
+    print(len(repo_prs),
+          f'pull requests from team {team} for repo {owner}/{repo}')
+    for u, p in repo_prs.items():
+        html_url = p.get('html_url', '')
+        state = p.get('state', '[unknown]')
+        print(f'{u:30s} {state:10s} {html_url}')
+
+
+def add_user_to_team(ctx, login, team_id):
+    res = http_put(ctx, f'teams/{team_id}/members/{login}')
     if res.status_code != 204:
-        print(f'add user "{username}" to team "{team_id}" failed: {res.status_code}')
+        status = res.status_code
+        print(f'add user "{login}" to team "{team_id}" failed: {status}')
     else:
-        print(f'added user "{username}" to team "{team_id}"')
+        print(f'added user "{login}" to team "{team_id}"')
 
 
 def register_user(ctx, username, fullname, email, notify):

@@ -192,7 +192,18 @@ def list_pull_requests(ctx, owner, repo, team):
     team_members = http_get(ctx, f'teams/{team_id}/members').json()
     team_usernames = [m.get('username', '') for m in team_members]
 
-    pull_requests = http_get(ctx, f'repos/{owner}/{repo}/pulls').json()
+    pull_requests = []
+    page_size = 30
+    page = 1
+    while True:
+        prs = http_get(ctx, f'repos/{owner}/{repo}/pulls',
+                       params={'state': 'all', 'sort': 'recentupdate',
+                               'limit': page_size, 'page': page}).json()
+        pull_requests.extend(prs)
+        if len(prs) < page_size:
+            break
+        page += 1
+
     user_prs = {p.get('user', {}).get('login', {}): p for p in pull_requests}
     team_prs = {k: v for k, v in user_prs.items() if k in team_usernames}
     repo_prs = {k: v for k, v in team_prs.items()
@@ -208,9 +219,15 @@ def list_pull_requests(ctx, owner, repo, team):
     for t in tardies:
         print(f'{t:30s} MISSING')
 
+    n_prs = len(repo_prs)
+    n_fail = len(tardies)
     print('\nSummary:')
-    print(f'{len(repo_prs):2d} pull requests OK')
-    print(f'{len(tardies):2d} pull requests MISSING')
+    print(f'{n_prs:2d} pull requests OK')
+    print(f'{n_fail:2d} pull requests MISSING')
+    if n_fail == 0:
+        print(f'The members of {team} made their homework!')
+    else:
+        print(f'The members of {team} have unfinished business!')
 
 
 def add_user_to_team(ctx, login, team_id):
@@ -254,12 +271,12 @@ def generate_password(length=24):
     return password
 
 
-def http_get(ctx, endpoint, accept='application/json'):
+def http_get(ctx, endpoint, params={}, accept='application/json'):
     base_url = ctx.obj['BASE_URL']
     url = f'{base_url}/{endpoint}'
     headers = get_auth_header(ctx)
     headers['Accept'] = accept
-    return requests.get(url, headers=headers)
+    return requests.get(url, headers=headers, params=params)
 
 
 def http_post(ctx, endpoint, payload, content_type='application/json',

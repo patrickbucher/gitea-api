@@ -191,17 +191,26 @@ def list_pull_requests(ctx, owner, repo, team):
     team_id = teams[0].get('id', 0)
     team_members = http_get(ctx, f'teams/{team_id}/members').json()
     team_usernames = [m.get('username', '') for m in team_members]
+
     pull_requests = http_get(ctx, f'repos/{owner}/{repo}/pulls').json()
     user_prs = {p.get('user', {}).get('login', {}): p for p in pull_requests}
     team_prs = {k: v for k, v in user_prs.items() if k in team_usernames}
     repo_prs = {k: v for k, v in team_prs.items()
                 if v.get('base', {}).get('repo', {}).get('name', '') == repo}
-    print(len(repo_prs),
-          f'pull requests from team {team} for repo {owner}/{repo}')
+
+    print(f'{"username":30s} {"state":10s} {"pull request"}')
+    print(f'{"--------":30s} {"-----":10s} {"------------"}')
     for u, p in repo_prs.items():
         html_url = p.get('html_url', '')
         state = p.get('state', '[unknown]')
         print(f'{u:30s} {state:10s} {html_url}')
+    tardies = [m for m in team_usernames if m not in repo_prs]
+    for t in tardies:
+        print(f'{t:30s} MISSING')
+
+    print('\nSummary:')
+    print(f'{len(repo_prs):2d} pull requests OK')
+    print(f'{len(tardies):2d} pull requests MISSING')
 
 
 def add_user_to_team(ctx, login, team_id):

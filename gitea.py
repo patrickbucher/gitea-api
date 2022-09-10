@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
+from datetime import timezone
 import secrets
 import string
+from zoneinfo import ZoneInfo
 
 import click
 import requests
@@ -197,8 +200,34 @@ def list_forks(ctx, owner, repo, team):
             break
         page += 1
     
-    print(forks)
-    # TODO: filter forks: only owned by entries of team_usernames
+    user_forks = {f.get('owner', {}).get('login', ''): f for f in forks}
+    team_forks = {k: v for k, v in user_forks.items() if k in team_usernames}
+    tardies = [u for u in team_usernames if u not in team_forks]
+
+    cet = ZoneInfo('Europe/Zurich')
+
+    print(f'{"username":30s} {"updated":17s} fork')
+    print(f'{"--------":30s} {"-------":17s} ----')
+    for u, f in team_forks.items():
+        updated = f.get('updated_at', '')
+        if updated:
+            updated = datetime.strptime(updated, '%Y-%m-%dT%H:%M:%SZ')
+            updated = updated.replace(tzinfo=timezone.utc)
+            updated = updated.astimezone(cet).strftime('%Y-%m-%d %H:%M')
+        html_url = f.get('html_url', '')
+        print(f'{u:30s} {updated:17s} {html_url}')
+    for t in tardies:
+        print(f'{t:30s} {"never":17s} -')
+
+    n_forks = len(team_forks)
+    n_fail = len(tardies)
+    print('\nSummary:')
+    print(f'{n_forks:2d} forks OK')
+    print(f'{n_fail:2d} forks MISSING')
+    if n_fail == 0:
+        print(f'The members of {team} made their homework!')
+    else:
+        print(f'The members of {team} have unfinished business!')
 
 
 @cli.command(help='Lists the pull requests of a team for a repository')

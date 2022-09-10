@@ -178,20 +178,36 @@ def set_team_read_rights(ctx, org):
             print(f'set team {id} read rights to read')
 
 
+@cli.command(help='Lists the forks of a team for a repository')
+@click.option('--owner')
+@click.option('--repo')
+@click.option('--team')
+@click.pass_context
+def list_forks(ctx, owner, repo, team):
+    team_usernames = fetch_team_usernames(ctx, owner, team)
+    forks = []
+    page_size = 30
+    page = 1
+    while True:
+        fs = http_get(ctx, f'repos/{owner}/{repo}/forks',
+                      params={'limit': page_size, 'page': page}).json()
+
+        forks.extend(fs)
+        if len(fs) < page_size:
+            break
+        page += 1
+    
+    print(forks)
+    # TODO: filter forks: only owned by entries of team_usernames
+
+
 @cli.command(help='Lists the pull requests of a team for a repository')
 @click.option('--owner')
 @click.option('--repo')
 @click.option('--team')
 @click.pass_context
 def list_pull_requests(ctx, owner, repo, team):
-    org_teams = http_get(ctx, f'orgs/{owner}/teams').json()
-    teams = list(filter(lambda t: t.get('name', '') == team, org_teams))
-    if len(teams) != 1:
-        print(f'looked for team {team}, found', len(teams))
-    team_id = teams[0].get('id', 0)
-    team_members = http_get(ctx, f'teams/{team_id}/members').json()
-    team_usernames = [m.get('username', '') for m in team_members]
-
+    team_usernames = fetch_team_usernames(ctx, owner, team)
     pull_requests = []
     page_size = 30
     page = 1
@@ -228,6 +244,16 @@ def list_pull_requests(ctx, owner, repo, team):
         print(f'The members of {team} made their homework!')
     else:
         print(f'The members of {team} have unfinished business!')
+
+
+def fetch_team_usernames(ctx, owner, team):
+    org_teams = http_get(ctx, f'orgs/{owner}/teams').json()
+    teams = list(filter(lambda t: t.get('name', '') == team, org_teams))
+    if len(teams) != 1:
+        print(f'looked for team {team}, found', len(teams))
+    team_id = teams[0].get('id', 0)
+    team_members = http_get(ctx, f'teams/{team_id}/members').json()
+    return [m.get('username', '') for m in team_members]
 
 
 def add_user_to_team(ctx, login, team_id):

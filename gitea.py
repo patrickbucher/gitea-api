@@ -10,6 +10,8 @@ import click
 import requests
 import yaml
 
+cet = ZoneInfo('Europe/Zurich')
+
 
 @click.group(help='Access the Gitea API.')
 @click.option('--token-file', default='.token')
@@ -110,7 +112,6 @@ def delete_org_teams(ctx, org, delete_owner_team):
 @click.option('--org')
 @click.pass_context
 def delete_org(ctx, org):
-    to_delete = http_get(ctx, f'orgs/{org}').json()
     repos = http_get(ctx, f'orgs/{org}/repos').json()
     owned = filter(lambda r: r.get('owner', {}).get('login', '') == org, repos)
     names = map(lambda r: r.get('name', ''), owned)
@@ -199,21 +200,17 @@ def list_forks(ctx, owner, repo, team):
         if len(fs) < page_size:
             break
         page += 1
-    
+
     user_forks = {f.get('owner', {}).get('login', ''): f for f in forks}
     team_forks = {k: v for k, v in user_forks.items() if k in team_usernames}
     tardies = [u for u in team_usernames if u not in team_forks]
-
-    cet = ZoneInfo('Europe/Zurich')
 
     print(f'{"username":30s} {"updated":17s} fork')
     print(f'{"--------":30s} {"-------":17s} ----')
     for u, f in team_forks.items():
         updated = f.get('updated_at', '')
         if updated:
-            updated = datetime.strptime(updated, '%Y-%m-%dT%H:%M:%SZ')
-            updated = updated.replace(tzinfo=timezone.utc)
-            updated = updated.astimezone(cet).strftime('%Y-%m-%d %H:%M')
+            updated = to_cet_datetime(updated)
         html_url = f.get('html_url', '')
         print(f'{u:30s} {updated:17s} {html_url}')
     for t in tardies:
@@ -273,6 +270,12 @@ def list_pull_requests(ctx, owner, repo, team):
         print(f'The members of {team} made their homework!')
     else:
         print(f'The members of {team} have unfinished business!')
+
+
+def to_cet_datetime(gitea_date_str, fmt='%Y-%m-%d %H:%M'):
+    utc_dt = datetime.strptime(gitea_date_str, '%Y-%m-%dT%H:%M:%SZ')
+    cet_dt = utc_dt.replace(tzinfo=timezone.utc)
+    return cet_dt.astimezone(cet).strftime(fmt)
 
 
 def fetch_team_usernames(ctx, owner, team):

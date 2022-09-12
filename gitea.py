@@ -10,12 +10,15 @@ import click
 import requests
 import yaml
 
-cet = ZoneInfo('Europe/Zurich')
+CET = ZoneInfo('Europe/Zurich')
+GITEA_DATETIME_FMT = '%Y-%m-%dT%H:%M:%SZ'
+API_BASE_URL = 'https://code.frickelbude.ch/api/v1'
+WEB_BASE_URL = 'https://code.frickelbude.ch/'
 
 
 @click.group(help='Access the Gitea API.')
 @click.option('--token-file', default='.token')
-@click.option('--base-url', default='https://code.frickelbude.ch/api/v1')
+@click.option('--base-url', default=API_BASE_URL)
 @click.pass_context
 def cli(ctx, token_file, base_url):
     ctx.ensure_object(dict)
@@ -161,14 +164,21 @@ def bulk_register(ctx, org, bulkfile, no_notify):
             add_user_to_team(ctx, username, team_id)
 
 
-@cli.command(help='Sets team reading permission for code, issues, pull-requests and releases')
+@cli.command(help='Sets team reading permission for code, pull-requests and ' +
+             'releases; write rights for issues.')
 @click.option('--org')
+@click.option('--team', default='')
 @click.pass_context
-def set_team_read_rights(ctx, org):
+def set_team_rights(ctx, org, team):
     teams = http_get(ctx, f'orgs/{org}/teams').json()
+    if team:
+        teams = [t for t in teams if t['name'] == team]
     team_ids = [t['id'] for t in teams if t['name'] != 'Owners']
-    units_map = {f'repo.{scope}': 'read'
-                 for scope in ['code', 'issues', 'pulls', 'releases']}
+    units_read_map = {f'repo.{scope}': 'read'
+                      for scope in ['code', 'pulls', 'releases']}
+    units_write_map = {f'repo.{scope}': 'write'
+                       for scope in ['issues']}
+    units_map = units_read_map | units_write_map
     payload = {
         'units_map': units_map,
         'includes_all_repositories': True,
@@ -177,9 +187,37 @@ def set_team_read_rights(ctx, org):
     for id in team_ids:
         res = http_patch(ctx, f'teams/{id}', payload)
         if res.status_code != 200:
-            print(f'set team {id} read rights failed: {res.status_code}')
+            print(f'set team {id} rights failed: {res.status_code}')
         else:
-            print(f'set team {id} read rights to read')
+            print(f'set team {id} rights to read')
+
+
+@cli.command(help='Create an issue for each team member for the repo of the owner.')
+@click.option('--owner')
+@click.option('--repo')
+@click.option('--team')
+@click.option('--title', help='The title of the issue.')
+@click.option('--text', help='The body text of the issue.')
+@click.option('--due', type=click.DateTime(formats=["%Y-%m-%d"]),
+              help='The due date of the issue.')
+@click.pass_context
+def create_bulk_issues(ctx, owner, repo, team, title, text, due):
+    team_usernames = fetch_team_usernames(ctx, owner, team)
+    for user in team_usernames:
+        payload = {
+            'title': title,
+            'body': text,
+            'assignees': [user],
+            'due_date': due.strftime(GITEA_DATETIME_FMT),
+        }
+        res = http_post(ctx, f'repos/{owner}/{repo}/issues', payload)
+        if res.status_code != 201:
+            print(f'create issue for {user} failed: {res.status_code}')
+        else:
+            body = res.json()
+            issue_nr = body.get('number', '?')
+            issue_url = f'{WEB_BASE_URL}{owner}/{repo}/issues/{issue_nr}'
+            print(f'created issue #{issue_nr} for {user}: {issue_url}')
 
 
 @cli.command(help='Lists the forks of a team for a repository')
@@ -273,9 +311,9 @@ def list_pull_requests(ctx, owner, repo, team):
 
 
 def to_cet_datetime(gitea_date_str, fmt='%Y-%m-%d %H:%M'):
-    utc_dt = datetime.strptime(gitea_date_str, '%Y-%m-%dT%H:%M:%SZ')
+    utc_dt = datetime.strptime(gitea_date_str, GITEA_DATETIME_FMT)
     cet_dt = utc_dt.replace(tzinfo=timezone.utc)
-    return cet_dt.astimezone(cet).strftime(fmt)
+    return cet_dt.astimezone(CET).strftime(fmt)
 
 
 def fetch_team_usernames(ctx, owner, team):

@@ -64,6 +64,13 @@ def list_repos(ctx, username):
     print(http_get(ctx, f'users/{username}/repos').json())
 
 
+@cli.command(help='Check whether or not a user exists')
+@click.option('--username')
+@click.pass_context
+def check_user_exists(ctx, username):
+    print(user_exists(ctx, username))
+
+
 @cli.command(help='Delete a user by its username with all owned repos')
 @click.option('--name')
 @click.pass_context
@@ -160,7 +167,8 @@ def bulk_register(ctx, org, bulkfile, no_notify):
             username = user_entry['username']
             fullname = user_entry['fullname']
             email = user_entry['email']
-            register_user(ctx, username, fullname, email, not no_notify)
+            if not user_exists(ctx, username):
+                register_user(ctx, username, fullname, email, not no_notify)
             add_user_to_team(ctx, username, team_id)
 
 
@@ -357,6 +365,17 @@ def register_user(ctx, username, fullname, email, notify):
 @click.option('--length', default=24)
 def genpw(length):
     print(generate_password(length))
+
+
+def user_exists(ctx, username):
+    res = http_get(ctx, f'admin/users')
+    if res.status_code != 200:
+        status = res.status_code
+        print(f'get users failed: {status}')
+        return False
+    users = res.json()
+    logins = map(lambda u: u.get('login', ''), users)
+    return username in logins
 
 
 def generate_password(length=24):

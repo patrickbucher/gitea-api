@@ -135,33 +135,41 @@ def delete_org(ctx, org):
 @click.option('--org')
 @click.option('--bulkfile', type=click.File('r'))
 @click.option('--no-notify', is_flag=True, help='Do not send notification email')
+@click.option('--existing-team', is_flag=True, help='Do not attempt to create teams.')
 @click.pass_context
-def bulk_register(ctx, org, bulkfile, no_notify):
+def bulk_register(ctx, org, bulkfile, no_notify, existing_team):
     data = yaml.load(bulkfile.read(), Loader=yaml.SafeLoader)
 
     assert http_get(ctx, f'orgs/{org}').status_code == 200
 
     for team_entry in data.get('teams', {}):
         teamname = team_entry['teamname']
-        new_team = {
-            'name': teamname,
-            'description': team_entry['description'],
-            'permission': 'read',
-            'units': [
-                'repo.code',
-                'repo.issues',
-                'repo.pulls',
-                'repo.releases',
-            ],
-            'includes_all_repositories': True,
-        }
-        res = http_post(ctx, f'orgs/{org}/teams', new_team)
-        if res.status_code != 201:
-            print(f'create team "{teamname}" failed: {res.status_code}')
-            continue
+        if existing_team:
+            org_teams = http_get(ctx, f'orgs/{org}/teams').json()
+            teams = list(filter(lambda t: t.get('name', '') == teamname, org_teams))
+            assert len(teams) == 1
+            team_id = teams[0].get('id', 0)
+            assert team_id != 0
         else:
-            print(f'created team "{teamname}"')
-        team_id = res.json().get('id', 0)
+            new_team = {
+                'name': teamname,
+                'description': team_entry['description'],
+                'permission': 'read',
+                'units': [
+                    'repo.code',
+                    'repo.issues',
+                    'repo.pulls',
+                    'repo.releases',
+                ],
+                'includes_all_repositories': True,
+            }
+            res = http_post(ctx, f'orgs/{org}/teams', new_team)
+            if res.status_code != 201:
+                print(f'create team "{teamname}" failed: {res.status_code}')
+                continue
+            else:
+                print(f'created team "{teamname}"')
+            team_id = res.json().get('id', 0)
 
         for user_entry in team_entry.get('users', []):
             username = user_entry['username']

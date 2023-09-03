@@ -65,3 +65,11 @@ So a user belongs to exactly one team.
 # TODO
 
 - email preferences for new users: use "only on mention", if possible
+
+## CSV to YAML
+
+To convert CSV data (exported by the school administration tool) to YAML, use the following command:
+
+```bash
+./csv-to-yaml.py source.csv target.yaml
+```

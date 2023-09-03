@@ -71,5 +71,5 @@ So a user belongs to exactly one team.
 To convert CSV data (exported by the school administration tool) to YAML, use the following command:
 
 ```bash
-./csv-to-yaml.py source.csv target.yaml
+./csv-to-yaml.py --name inf22a --description S-INF22aL inf22a.csv inf22a.yaml
 ```

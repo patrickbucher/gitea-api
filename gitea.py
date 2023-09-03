@@ -118,6 +118,29 @@ def delete_org_teams(ctx, org, delete_owner_team):
         print(http_delete(ctx, f'teams/{team_id}'))
 
 
+@cli.command(help='Delete a team of an organization and all its users')
+@click.option('--org')
+@click.option('--team')
+@click.option('--dry', is_flag=True)
+@click.pass_context
+def delete_teams_users(ctx, org, team, dry):
+    org_teams = http_get(ctx, f'orgs/{org}/teams').json()
+    team_ids_by_name = dict(map(lambda t: (t['name'], t['id']), org_teams))
+    if team not in team_ids_by_name:
+        print(f'team {team} is not in org {org}')
+        return
+    team_id = team_ids_by_name[team]
+    team_members = http_get(ctx, f'teams/{team_id}/members').json()
+    team_logins = list(map(lambda tm: tm['login'], team_members))
+    if dry:
+        print('to be deleted (dry run):\n', '\n'.join(sorted(team_logins)), sep='')
+    else:
+        for login in team_logins:
+            print('delete user', login)
+            ctx.invoke(delete_user, name=login)
+    print(http_delete(ctx, f'teams/{team_id}'))
+
+
 @cli.command(help='Delete the given organization with all repos')
 @click.option('--org')
 @click.pass_context

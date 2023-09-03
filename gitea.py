@@ -133,7 +133,8 @@ def delete_teams_users(ctx, org, team, dry):
     team_members = http_get(ctx, f'teams/{team_id}/members').json()
     team_logins = list(map(lambda tm: tm['login'], team_members))
     if dry:
-        print('to be deleted (dry run):\n', '\n'.join(sorted(team_logins)), sep='')
+        print('to be deleted (dry run):\n',
+              '\n'.join(sorted(team_logins)), sep='')
     else:
         for login in team_logins:
             print('delete user', login)
@@ -156,11 +157,12 @@ def delete_org(ctx, org):
 
 @cli.command(help='Registers all the teams with users to a given organization')
 @click.option('--org')
-@click.option('--bulkfile', type=click.File('r'))
+@click.option('--bulkfile', type=click.File('r', encoding="utf-8"))
 @click.option('--no-notify', is_flag=True, help='Do not send notification email')
 @click.option('--existing-team', is_flag=True, help='Do not attempt to create teams.')
+@click.option('--password', default=None, help='Default password (to be changed)')
 @click.pass_context
-def bulk_register(ctx, org, bulkfile, no_notify, existing_team):
+def bulk_register(ctx, org, bulkfile, no_notify, existing_team, password):
     data = yaml.load(bulkfile.read(), Loader=yaml.SafeLoader)
 
     assert http_get(ctx, f'orgs/{org}').status_code == 200
@@ -169,7 +171,8 @@ def bulk_register(ctx, org, bulkfile, no_notify, existing_team):
         teamname = team_entry['teamname']
         if existing_team:
             org_teams = http_get(ctx, f'orgs/{org}/teams').json()
-            teams = list(filter(lambda t: t.get('name', '') == teamname, org_teams))
+            teams = list(filter(lambda t: t.get(
+                'name', '') == teamname, org_teams))
             assert len(teams) == 1
             team_id = teams[0].get('id', 0)
             assert team_id != 0
@@ -199,7 +202,8 @@ def bulk_register(ctx, org, bulkfile, no_notify, existing_team):
             fullname = user_entry['fullname']
             email = user_entry['email']
             if not user_exists(ctx, username):
-                register_user(ctx, username, fullname, email, not no_notify)
+                register_user(ctx, username, fullname,
+                              email, not no_notify, password)
             add_user_to_team(ctx, username, team_id)
 
 
@@ -374,7 +378,7 @@ def add_user_to_team(ctx, login, team_id):
         print(f'added user "{login}" to team "{team_id}"')
 
 
-def register_user(ctx, username, fullname, email, notify):
+def register_user(ctx, username, fullname, email, notify, password=None):
     new_user = {
         'username': username,
         'email': email,
@@ -383,7 +387,7 @@ def register_user(ctx, username, fullname, email, notify):
         'restricted': True,
         'send_notify': notify,
         'visibility': 'limited',
-        'password': generate_password(),
+        'password': generate_password() if not password else password,
     }
     res = http_post(ctx, 'admin/users', new_user)
     if res.status_code != 201:

@@ -65,6 +65,7 @@ So a user belongs to exactly one team.
 # TODO
 
 - email preferences for new users: use "only on mention", if possible
+  - alternative: via database using `update "user" set email_notifications_preference = 'onmention';`
 
 ## CSV to YAML
 
